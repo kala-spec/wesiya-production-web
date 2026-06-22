@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.contrib.auth.models import User
 
 
 class TrustedMember(models.Model):
@@ -41,3 +42,20 @@ class TrustedAccessLog(models.Model):
 
     def __str__(self):
         return f"{self.trusted_member_name} accessed {self.user.email}"
+
+
+class TrustedContact(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="trusted_contacts")
+    full_name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    relationship = models.CharField(max_length=100, blank=True)
+    access_code = models.CharField(max_length=100)
+
+    can_view_notes = models.BooleanField(default=True)
+    can_view_profile = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.full_name} trusted by {self.user.username}"
