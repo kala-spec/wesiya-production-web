@@ -4,6 +4,9 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import TrustedContact
 import json
+from profiles.models import UserProfile
+from notes.models import Note
+from django.db import models
 
 
 @csrf_exempt
@@ -87,3 +90,80 @@ def get_trusted_contacts(request, user_id):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500) 
+
+
+
+@csrf_exempt
+def verify_trusted_access(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST method allowed"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+
+        owner_username = data.get("owner_username", "").strip().lower()
+        contact_identity = data.get("contact_identity", "").strip().lower()
+        access_code = data.get("access_code", "").strip()
+
+        if not owner_username or not contact_identity or not access_code:
+            return JsonResponse(
+                {"error": "Owner username, contact email/phone, and access code are required"},
+                status=400
+            )
+
+        owner = User.objects.get(username__iexact=owner_username)
+
+        trusted_contact = TrustedContact.objects.filter(
+            user=owner,
+            access_code=access_code
+        ).filter(
+            models.Q(email__iexact=contact_identity) |
+            models.Q(phone__iexact=contact_identity)
+        ).first()
+
+        if not trusted_contact:
+            return JsonResponse({"error": "Invalid trusted access information"}, status=403)
+
+        profile_data = None
+        notes_data = []
+
+        if trusted_contact.can_view_profile:
+            profile, created = UserProfile.objects.get_or_create(user=owner)
+            profile_data = {
+                "full_name": profile.full_name,
+                "phone": profile.phone,
+                "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else "",
+                "height": profile.height,
+                "emergency_note": profile.emergency_note,
+            }
+
+        if trusted_contact.can_view_notes:
+            notes = Note.objects.filter(user=owner).order_by("-created_at")[:10]
+
+            for note in notes:
+                notes_data.append({
+                    "id": note.id,
+                    "title": note.title,
+                    "content": note.content,
+                    "created_at": note.created_at.isoformat(),
+                })
+
+        return JsonResponse({
+            "message": "Trusted access granted",
+            "owner": {
+                "username": owner.username,
+                "email": owner.email,
+            },
+            "trusted_contact": {
+                "full_name": trusted_contact.full_name,
+                "relationship": trusted_contact.relationship,
+            },
+            "profile": profile_data,
+            "notes": notes_data,
+        }, status=200)
+
+    except User.DoesNotExist:
+        return JsonResponse({"error": "Account owner not found"}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
