@@ -26,17 +26,43 @@ def get_users_for_super_admin(request):
 
         users_data = []
 
+        total_users = users.count()
+        verified_users = 0
+        unverified_users = 0
+        total_notes = 0
+        total_voice_notes = 0
+
         for user in users:
             profile = getattr(user, "profile", None)
 
             full_name = ""
             phone = ""
             location = ""
+            country = ""
+            city = ""
 
             if profile:
                 full_name = getattr(profile, "full_name", "") or ""
                 phone = getattr(profile, "phone", "") or ""
                 location = getattr(profile, "location", "") or ""
+                country = getattr(profile, "country", "") or ""
+                city = getattr(profile, "city", "") or ""
+
+            notes_count = user.notes.count() if hasattr(user, "notes") else 0
+            voice_notes_count = (
+                user.voice_notes.count() if hasattr(user, "voice_notes") else 0
+            )
+
+            is_verified = user.is_active
+            verification_status = "Completed" if is_verified else "Not completed"
+
+            if is_verified:
+                verified_users += 1
+            else:
+                unverified_users += 1
+
+            total_notes += notes_count
+            total_voice_notes += voice_notes_count
 
             users_data.append({
                 "id": user.id,
@@ -45,12 +71,27 @@ def get_users_for_super_admin(request):
                 "email": user.email,
                 "phone": phone,
                 "location": location,
+                "country": country,
+                "city": city,
                 "is_superuser": user.is_superuser,
+                "is_verified": is_verified,
+                "verification_status": verification_status,
+                "notes_count": notes_count,
+                "voice_notes_count": voice_notes_count,
+                "total_saved_items": notes_count + voice_notes_count,
                 "date_joined": user.date_joined.isoformat(),
             })
 
         return JsonResponse({
-            "users": users_data
+            "stats": {
+                "total_users": total_users,
+                "verified_users": verified_users,
+                "unverified_users": unverified_users,
+                "total_notes": total_notes,
+                "total_voice_notes": total_voice_notes,
+                "total_saved_items": total_notes + total_voice_notes,
+            },
+            "users": users_data,
         }, status=200)
 
     except User.DoesNotExist:

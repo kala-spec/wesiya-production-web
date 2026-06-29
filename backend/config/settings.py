@@ -145,3 +145,9 @@ REST_FRAMEWORK = {
 }
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "noreply@wesiya.local"
+# Passkey / WebAuthn settings
+PASSKEY_RP_ID = "localhost"
+PASSKEY_RP_NAME = "Wesiya"
+PASSKEY_ORIGIN = "http://localhost:3000"
