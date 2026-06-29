@@ -1,4 +1,6 @@
 from django.urls import path
+from django.urls import path
+from . import views
 from .views import (
     create_note,
     get_user_notes,
@@ -12,5 +14,6 @@ urlpatterns = [
     path("user/<int:user_id>/", get_user_notes),
     path("analyze/", analyze_note),
     path("voice/upload/", upload_voice_note),
+    path("voice/delete/<int:voice_note_id>/", views.delete_voice_note),
     path("voice/user/<int:user_id>/", get_user_voice_notes),
 ]

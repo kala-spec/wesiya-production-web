@@ -1,10 +1,10 @@
-from django.shortcuts import render
+import json
+
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .models import Note, VoiceNote
+
 from .models import Note, VoiceNote, NoteAnalysis
-import json
 
 
 @csrf_exempt
@@ -20,7 +20,10 @@ def create_note(request):
         content = data.get("content", "").strip()
 
         if not user_id or not content:
-            return JsonResponse({"error": "User ID and content are required"}, status=400)
+            return JsonResponse(
+                {"error": "User ID and content are required"},
+                status=400
+            )
 
         user = User.objects.get(id=user_id)
 
@@ -42,6 +45,9 @@ def create_note(request):
 
     except User.DoesNotExist:
         return JsonResponse({"error": "User not found"}, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -76,6 +82,7 @@ def get_user_notes(request, user_id):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+
 @csrf_exempt
 def upload_voice_note(request):
     if request.method != "POST":
@@ -87,7 +94,10 @@ def upload_voice_note(request):
         audio_file = request.FILES.get("audio_file")
 
         if not user_id or not audio_file:
-            return JsonResponse({"error": "User ID and audio file are required"}, status=400)
+            return JsonResponse(
+                {"error": "User ID and audio file are required"},
+                status=400
+            )
 
         user = User.objects.get(id=user_id)
 
@@ -141,7 +151,44 @@ def get_user_voice_notes(request, user_id):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-    
+
+
+@csrf_exempt
+def delete_voice_note(request, voice_note_id):
+    if request.method != "DELETE":
+        return JsonResponse({"error": "DELETE method required"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        user_id = data.get("user_id")
+
+        if not user_id:
+            return JsonResponse({"error": "User ID is required"}, status=400)
+
+        voice_note = VoiceNote.objects.get(
+            id=voice_note_id,
+            user_id=user_id
+        )
+
+        if voice_note.audio_file:
+            voice_note.audio_file.delete(save=False)
+
+        voice_note.delete()
+
+        return JsonResponse({
+            "message": "Voice note deleted successfully"
+        }, status=200)
+
+    except VoiceNote.DoesNotExist:
+        return JsonResponse({"error": "Voice note not found"}, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
 @csrf_exempt
 def analyze_note(request):
     if request.method != "POST":
@@ -162,21 +209,53 @@ def analyze_note(request):
         if not content:
             return JsonResponse({"error": "Note content is empty"}, status=400)
 
-        # Simple temporary analysis logic
-        sentences = [s.strip() for s in content.replace("!", ".").replace("?", ".").split(".") if s.strip()]
+        sentences = [
+            sentence.strip()
+            for sentence in content.replace("!", ".").replace("?", ".").split(".")
+            if sentence.strip()
+        ]
 
         summary = sentences[0] if sentences else content[:120]
-
         key_points = sentences[:3]
 
-        action_keywords = ["need to", "must", "should", "todo", "to do", "call", "finish", "submit", "pay", "meet"]
+        action_keywords = [
+            "need to",
+            "must",
+            "should",
+            "todo",
+            "to do",
+            "call",
+            "finish",
+            "submit",
+            "pay",
+            "meet",
+        ]
+
         action_items = [
-            sentence for sentence in sentences
+            sentence
+            for sentence in sentences
             if any(keyword in sentence.lower() for keyword in action_keywords)
         ]
 
-        negative_words = ["sad", "angry", "stress", "worried", "fear", "bad", "hurt", "problem"]
-        positive_words = ["happy", "good", "great", "excited", "grateful", "better"]
+        negative_words = [
+            "sad",
+            "angry",
+            "stress",
+            "worried",
+            "fear",
+            "bad",
+            "hurt",
+            "problem",
+        ]
+
+        positive_words = [
+            "happy",
+            "good",
+            "great",
+            "excited",
+            "grateful",
+            "better",
+        ]
 
         lower_content = content.lower()
 
@@ -187,24 +266,34 @@ def analyze_note(request):
         else:
             emotional_tone = "neutral"
 
-        risk_words = ["suicide", "kill myself", "hurt myself", "emergency", "danger"]
-        risk_level = "high" if any(word in lower_content for word in risk_words) else "normal"
+        risk_words = [
+            "suicide",
+            "kill myself",
+            "hurt myself",
+            "emergency",
+            "danger",
+        ]
 
-        analysis, created = NoteAnalysis.objects.update_or_create(
+        risk_level = (
+            "high"
+            if any(word in lower_content for word in risk_words)
+            else "normal"
+        )
+
+        analysis = NoteAnalysis.objects.create(
             written_note=None,
             voice_note=None,
-            defaults={
-                "summary": summary,
-                "key_points": key_points,
-                "action_items": action_items,
-                "emotional_tone": emotional_tone,
-                "risk_level": risk_level,
-            }
+            summary=summary,
+            key_points=key_points,
+            action_items=action_items,
+            emotional_tone=emotional_tone,
+            risk_level=risk_level,
         )
 
         return JsonResponse({
             "message": "Note analyzed successfully",
             "analysis": {
+                "id": analysis.id,
                 "summary": summary,
                 "key_points": key_points,
                 "action_items": action_items,
@@ -215,6 +304,9 @@ def analyze_note(request):
 
     except Note.DoesNotExist:
         return JsonResponse({"error": "Note not found"}, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

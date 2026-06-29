@@ -19,5 +19,6 @@ urlpatterns = [
     path("api/accounts/", include("accounts.urls")),
     path("api/notes/", include("notes.urls")),
     path("api/profiles/", include("profiles.urls")),
+    path("api/admin-panel/", include("admin_panel.urls")),
 ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
