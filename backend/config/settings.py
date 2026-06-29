@@ -28,12 +28,15 @@ CSRF_TRUSTED_ORIGINS = [
     "https://wesiya-backend.onrender.com",
     "https://wesiya-production-web.vercel.app",
     "https://wesiya-production-web-z6kd.vercel.app",
+    "https://*.vercel.app",
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://wesiya-production-web.vercel.app",
-    "https://wesiya-production-web-z6kd.vercel.app",
+]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
